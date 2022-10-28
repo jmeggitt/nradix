@@ -24,17 +24,17 @@ type Tree[T any] struct {
 }
 
 const (
-	startbit  = uint32(0x80000000)
-	startbyte = byte(0x80)
+	startBit  = uint32(0x80000000)
+	startByte = byte(0x80)
 )
 
 var (
-	ErrNodeBusy = errors.New("Node Busy")
-	ErrNotFound = errors.New("No Such Node")
-	ErrBadIP    = errors.New("Bad IP address or mask")
+	ErrNodeBusy = errors.New("node Busy")
+	ErrNotFound = errors.New("no Such Node")
+	ErrBadIP    = errors.New("bad IP address or mask")
 )
 
-// NewTree creates Tree and preallocates (if preallocate not zero) number of nodes that would be ready to fill with data.
+// NewTree creates Tree and pre-allocates (if preallocate not zero) number of nodes that would be ready to fill with data.
 func NewTree[T any](preallocate int) *Tree[T] {
 	tree := new(Tree[T])
 	tree.root = tree.newnode()
@@ -49,10 +49,10 @@ func NewTree[T any](preallocate int) *Tree[T] {
 
 	var key, mask uint32
 
-	for inc := startbit; preallocate > 0; inc, preallocate = inc>>1, preallocate-1 {
+	for inc := startBit; preallocate > 0; inc, preallocate = inc>>1, preallocate-1 {
 		key = 0
 		mask >>= 1
-		mask |= startbit
+		mask |= startBit
 
 		for {
 			tree.insert32(key, mask, nil, false)
@@ -86,7 +86,6 @@ func (tree *Tree[T]) AddCIDRb(cidr []byte, val T) error {
 	return tree.insert(ip, mask, val, false)
 }
 
-// AddCIDR adds value associated with IP/mask to the tree. Will return error for invalid CIDR or if value already exists.
 func (tree *Tree[T]) SetCIDR(cidr string, val T) error {
 	return tree.SetCIDRb([]byte(cidr), val)
 }
@@ -147,7 +146,7 @@ func (tree *Tree[T]) DeleteCIDRb(cidr []byte) error {
 	return tree.delete(ip, mask, false)
 }
 
-// Find CIDR traverses tree to proper Node and returns previously saved information in longest covered IP.
+// FindCIDR traverses tree to proper Node and returns previously saved information in the longest covered IP.
 func (tree *Tree[T]) FindCIDR(cidr string) (T, error) {
 	return tree.FindCIDRb([]byte(cidr))
 }
@@ -168,7 +167,7 @@ func (tree *Tree[T]) FindCIDRb(cidr []byte) (T, error) {
 }
 
 func (tree *Tree[T]) insert32(key, mask uint32, value T, overwrite bool) error {
-	bit := startbit
+	bit := startBit
 	node := tree.root
 	next := tree.root
 	for bit&mask != 0 {
@@ -212,7 +211,7 @@ func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool
 	}
 
 	var i int
-	bit := startbyte
+	bit := startByte
 	node := tree.root
 	next := tree.root
 	for bit&mask[i] != 0 {
@@ -231,7 +230,7 @@ func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool
 			if i++; i == len(key) {
 				break
 			}
-			bit = startbyte
+			bit = startByte
 		}
 
 	}
@@ -256,7 +255,7 @@ func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool
 			if i++; i == len(key) {
 				break
 			}
-			bit = startbyte
+			bit = startByte
 		}
 	}
 	node.value = value
@@ -265,7 +264,7 @@ func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool
 }
 
 func (tree *Tree[T]) delete32(key, mask uint32, wholeRange bool) error {
-	bit := startbit
+	bit := startBit
 	node := tree.root
 	for node != nil && bit&mask != 0 {
 		if key&bit != 0 {
@@ -318,7 +317,7 @@ func (tree *Tree[T]) delete(key net.IP, mask net.IPMask, wholeRange bool) error 
 	}
 
 	var i int
-	bit := startbyte
+	bit := startByte
 	node := tree.root
 	for node != nil && bit&mask[i] != 0 {
 		if key[i]&bit != 0 {
@@ -330,7 +329,7 @@ func (tree *Tree[T]) delete(key net.IP, mask net.IPMask, wholeRange bool) error 
 			if i++; i == len(key) {
 				break
 			}
-			bit = startbyte
+			bit = startByte
 		}
 	}
 	if node == nil {
@@ -372,7 +371,7 @@ func (tree *Tree[T]) delete(key net.IP, mask net.IPMask, wholeRange bool) error 
 }
 
 func (tree *Tree[T]) find32(key, mask uint32) (value T) {
-	bit := startbit
+	bit := startBit
 	node := tree.root
 	for node != nil {
 		if node.value != nil {
@@ -397,7 +396,7 @@ func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value T) {
 		return ErrBadIP
 	}
 	var i int
-	bit := startbyte
+	bit := startByte
 	node := tree.root
 	for node != nil {
 		if node.value != nil {
@@ -412,7 +411,7 @@ func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value T) {
 			break
 		}
 		if bit >>= 1; bit == 0 {
-			i, bit = i+1, startbyte
+			i, bit = i+1, startByte
 			if i >= len(key) {
 				// reached depth of the tree, there should be matching node...
 				if node != nil {
