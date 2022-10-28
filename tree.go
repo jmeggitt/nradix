@@ -10,17 +10,17 @@ import (
 	"net"
 )
 
-type node struct {
-	left, right, parent *node
-	value               interface{}
+type node[T any] struct {
+	left, right, parent *node[T]
+	value               T
 }
 
 // Tree implements radix tree for working with IP/mask. Thread safety is not guaranteed, you should choose your own style of protecting safety of operations.
-type Tree struct {
-	root *node
-	free *node
+type Tree[T any] struct {
+	root *node[T]
+	free *node[T]
 
-	alloc []node
+	alloc []node[T]
 }
 
 const (
@@ -35,8 +35,8 @@ var (
 )
 
 // NewTree creates Tree and preallocates (if preallocate not zero) number of nodes that would be ready to fill with data.
-func NewTree(preallocate int) *Tree {
-	tree := new(Tree)
+func NewTree[T any](preallocate int) *Tree[T] {
+	tree := new(Tree[T])
 	tree.root = tree.newnode()
 	if preallocate == 0 {
 		return tree
@@ -67,11 +67,11 @@ func NewTree(preallocate int) *Tree {
 }
 
 // AddCIDR adds value associated with IP/mask to the tree. Will return error for invalid CIDR or if value already exists.
-func (tree *Tree) AddCIDR(cidr string, val interface{}) error {
+func (tree *Tree[T]) AddCIDR(cidr string, val T) error {
 	return tree.AddCIDRb([]byte(cidr), val)
 }
 
-func (tree *Tree) AddCIDRb(cidr []byte, val interface{}) error {
+func (tree *Tree[T]) AddCIDRb(cidr []byte, val T) error {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -87,11 +87,11 @@ func (tree *Tree) AddCIDRb(cidr []byte, val interface{}) error {
 }
 
 // AddCIDR adds value associated with IP/mask to the tree. Will return error for invalid CIDR or if value already exists.
-func (tree *Tree) SetCIDR(cidr string, val interface{}) error {
+func (tree *Tree[T]) SetCIDR(cidr string, val T) error {
 	return tree.SetCIDRb([]byte(cidr), val)
 }
 
-func (tree *Tree) SetCIDRb(cidr []byte, val interface{}) error {
+func (tree *Tree[T]) SetCIDRb(cidr []byte, val T) error {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -108,11 +108,11 @@ func (tree *Tree) SetCIDRb(cidr []byte, val interface{}) error {
 
 // DeleteWholeRangeCIDR removes all values associated with IPs
 // in the entire subnet specified by the CIDR.
-func (tree *Tree) DeleteWholeRangeCIDR(cidr string) error {
+func (tree *Tree[T]) DeleteWholeRangeCIDR(cidr string) error {
 	return tree.DeleteWholeRangeCIDRb([]byte(cidr))
 }
 
-func (tree *Tree) DeleteWholeRangeCIDRb(cidr []byte) error {
+func (tree *Tree[T]) DeleteWholeRangeCIDRb(cidr []byte) error {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -128,11 +128,11 @@ func (tree *Tree) DeleteWholeRangeCIDRb(cidr []byte) error {
 }
 
 // DeleteCIDR removes value associated with IP/mask from the tree.
-func (tree *Tree) DeleteCIDR(cidr string) error {
+func (tree *Tree[T]) DeleteCIDR(cidr string) error {
 	return tree.DeleteCIDRb([]byte(cidr))
 }
 
-func (tree *Tree) DeleteCIDRb(cidr []byte) error {
+func (tree *Tree[T]) DeleteCIDRb(cidr []byte) error {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -148,11 +148,11 @@ func (tree *Tree) DeleteCIDRb(cidr []byte) error {
 }
 
 // Find CIDR traverses tree to proper Node and returns previously saved information in longest covered IP.
-func (tree *Tree) FindCIDR(cidr string) (interface{}, error) {
+func (tree *Tree[T]) FindCIDR(cidr string) (T, error) {
 	return tree.FindCIDRb([]byte(cidr))
 }
 
-func (tree *Tree) FindCIDRb(cidr []byte) (interface{}, error) {
+func (tree *Tree[T]) FindCIDRb(cidr []byte) (T, error) {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -167,7 +167,7 @@ func (tree *Tree) FindCIDRb(cidr []byte) (interface{}, error) {
 	return tree.find(ip, mask), nil
 }
 
-func (tree *Tree) insert32(key, mask uint32, value interface{}, overwrite bool) error {
+func (tree *Tree[T]) insert32(key, mask uint32, value T, overwrite bool) error {
 	bit := startbit
 	node := tree.root
 	next := tree.root
@@ -206,7 +206,7 @@ func (tree *Tree) insert32(key, mask uint32, value interface{}, overwrite bool) 
 	return nil
 }
 
-func (tree *Tree) insert(key net.IP, mask net.IPMask, value interface{}, overwrite bool) error {
+func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool) error {
 	if len(key) != len(mask) {
 		return ErrBadIP
 	}
@@ -264,7 +264,7 @@ func (tree *Tree) insert(key net.IP, mask net.IPMask, value interface{}, overwri
 	return nil
 }
 
-func (tree *Tree) delete32(key, mask uint32, wholeRange bool) error {
+func (tree *Tree[T]) delete32(key, mask uint32, wholeRange bool) error {
 	bit := startbit
 	node := tree.root
 	for node != nil && bit&mask != 0 {
@@ -312,7 +312,7 @@ func (tree *Tree) delete32(key, mask uint32, wholeRange bool) error {
 	return nil
 }
 
-func (tree *Tree) delete(key net.IP, mask net.IPMask, wholeRange bool) error {
+func (tree *Tree[T]) delete(key net.IP, mask net.IPMask, wholeRange bool) error {
 	if len(key) != len(mask) {
 		return ErrBadIP
 	}
@@ -371,7 +371,7 @@ func (tree *Tree) delete(key net.IP, mask net.IPMask, wholeRange bool) error {
 	return nil
 }
 
-func (tree *Tree) find32(key, mask uint32) (value interface{}) {
+func (tree *Tree[T]) find32(key, mask uint32) (value T) {
 	bit := startbit
 	node := tree.root
 	for node != nil {
@@ -392,7 +392,7 @@ func (tree *Tree) find32(key, mask uint32) (value interface{}) {
 	return value
 }
 
-func (tree *Tree) find(key net.IP, mask net.IPMask) (value interface{}) {
+func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value T) {
 	if len(key) != len(mask) {
 		return ErrBadIP
 	}
@@ -425,7 +425,7 @@ func (tree *Tree) find(key net.IP, mask net.IPMask) (value interface{}) {
 	return value
 }
 
-func (tree *Tree) newnode() (p *node) {
+func (tree *Tree[T]) newnode() (p *node[T]) {
 	if tree.free != nil {
 		p = tree.free
 		tree.free = tree.free.right
@@ -441,7 +441,7 @@ func (tree *Tree) newnode() (p *node) {
 	ln := len(tree.alloc)
 	if ln == cap(tree.alloc) {
 		// filled one row, make bigger one
-		tree.alloc = make([]node, ln+200)[:1] // 200, 600, 1400, 3000, 6200, 12600 ...
+		tree.alloc = make([]node[T], ln+200)[:1] // 200, 600, 1400, 3000, 6200, 12600 ...
 		ln = 0
 	} else {
 		tree.alloc = tree.alloc[:ln+1]
