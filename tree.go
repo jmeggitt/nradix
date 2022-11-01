@@ -6,13 +6,15 @@ package nradix
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"net"
+	"net/netip"
 )
 
 type node[T any] struct {
 	left, right, parent *node[T]
-	value               T
+	value               *T
 }
 
 // Tree implements radix tree for working with IP/mask. Thread safety is not guaranteed, you should choose your own style of protecting safety of operations.
@@ -55,7 +57,9 @@ func NewTree[T any](preallocate int) *Tree[T] {
 		mask |= startBit
 
 		for {
-			tree.insert32(key, mask, nil, false)
+			if tree.insert32(key, mask, nil, false) != nil {
+				panic("unreachable")
+			}
 			key += inc
 			if key == 0 { // magic bits collide
 				break
@@ -77,13 +81,40 @@ func (tree *Tree[T]) AddCIDRb(cidr []byte, val T) error {
 		if err != nil {
 			return err
 		}
-		return tree.insert32(ip, mask, val, false)
+		return tree.insert32(ip, mask, &val, false)
 	}
 	ip, mask, err := parsecidr6(cidr)
 	if err != nil {
 		return err
 	}
-	return tree.insert(ip, mask, val, false)
+	return tree.insert(ip, mask, &val, false)
+}
+
+func splitPrefix4(prefix netip.Prefix) (uint32, uint32) {
+	ip := binary.BigEndian.Uint32(prefix.Addr().AsSlice())
+	mask := uint32(0xffffffff) << (32 - prefix.Bits())
+	return ip, mask
+}
+
+func splitPrefix6(prefix netip.Prefix) (net.IP, net.IPMask) {
+	ip := prefix.Masked().Addr().AsSlice()
+	mask := net.CIDRMask(prefix.Bits(), prefix.Addr().BitLen())
+
+	return ip, mask
+}
+
+func (tree *Tree[T]) Add(prefix netip.Prefix, val T) error {
+	if !prefix.IsValid() {
+		return ErrBadIP
+	}
+
+	if prefix.Addr().Is4() {
+		ip, mask := splitPrefix4(prefix)
+		return tree.insert32(ip, mask, &val, false)
+	}
+
+	ip, mask := splitPrefix6(prefix)
+	return tree.insert(ip, mask, &val, false)
 }
 
 func (tree *Tree[T]) SetCIDR(cidr string, val T) error {
@@ -96,13 +127,13 @@ func (tree *Tree[T]) SetCIDRb(cidr []byte, val T) error {
 		if err != nil {
 			return err
 		}
-		return tree.insert32(ip, mask, val, true)
+		return tree.insert32(ip, mask, &val, true)
 	}
 	ip, mask, err := parsecidr6(cidr)
 	if err != nil {
 		return err
 	}
-	return tree.insert(ip, mask, val, true)
+	return tree.insert(ip, mask, &val, true)
 }
 
 // DeleteWholeRangeCIDR removes all values associated with IPs
@@ -147,11 +178,11 @@ func (tree *Tree[T]) DeleteCIDRb(cidr []byte) error {
 }
 
 // FindCIDR traverses tree to proper Node and returns previously saved information in the longest covered IP.
-func (tree *Tree[T]) FindCIDR(cidr string) (T, error) {
+func (tree *Tree[T]) FindCIDR(cidr string) (*T, error) {
 	return tree.FindCIDRb([]byte(cidr))
 }
 
-func (tree *Tree[T]) FindCIDRb(cidr []byte) (T, error) {
+func (tree *Tree[T]) FindCIDRb(cidr []byte) (*T, error) {
 	if bytes.IndexByte(cidr, '.') > 0 {
 		ip, mask, err := parsecidr4(cidr)
 		if err != nil {
@@ -166,7 +197,7 @@ func (tree *Tree[T]) FindCIDRb(cidr []byte) (T, error) {
 	return tree.find(ip, mask), nil
 }
 
-func (tree *Tree[T]) insert32(key, mask uint32, value T, overwrite bool) error {
+func (tree *Tree[T]) insert32(key, mask uint32, value *T, overwrite bool) error {
 	bit := startBit
 	node := tree.root
 	next := tree.root
@@ -205,7 +236,7 @@ func (tree *Tree[T]) insert32(key, mask uint32, value T, overwrite bool) error {
 	return nil
 }
 
-func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value T, overwrite bool) error {
+func (tree *Tree[T]) insert(key net.IP, mask net.IPMask, value *T, overwrite bool) error {
 	if len(key) != len(mask) {
 		return ErrBadIP
 	}
@@ -370,7 +401,7 @@ func (tree *Tree[T]) delete(key net.IP, mask net.IPMask, wholeRange bool) error 
 	return nil
 }
 
-func (tree *Tree[T]) find32(key, mask uint32) (value T) {
+func (tree *Tree[T]) find32(key, mask uint32) (value *T) {
 	bit := startBit
 	node := tree.root
 	for node != nil {
@@ -391,7 +422,7 @@ func (tree *Tree[T]) find32(key, mask uint32) (value T) {
 	return value
 }
 
-func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value T) {
+func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value *T) {
 	var i int
 	bit := startByte
 	node := tree.root
