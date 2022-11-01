@@ -392,9 +392,6 @@ func (tree *Tree[T]) find32(key, mask uint32) (value T) {
 }
 
 func (tree *Tree[T]) find(key net.IP, mask net.IPMask) (value T) {
-	if len(key) != len(mask) {
-		return ErrBadIP
-	}
 	var i int
 	bit := startByte
 	node := tree.root
