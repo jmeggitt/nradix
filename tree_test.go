@@ -353,3 +353,67 @@ func TestRegression6(t *testing.T) {
 		t.Errorf("Wrong value from /128 test, got %d, expected 12345", inf)
 	}
 }
+
+func TestSingleIpv4MappedIpv6(t *testing.T) {
+	tr := NewTree(0)
+
+	if err := tr.AddCIDR("::ffff:1.2.3.4", 1); err != nil {
+		t.Error("Could not add IPv4-mapped IPv6 address:", err)
+	}
+
+	inf, err := tr.FindCIDR("::ffff:1.2.3.4")
+	if err != nil {
+		t.Error("Could not find IPv4-mapped IPv6 address (::ffff:1.2.3.4), error:", err)
+	} else if inf == nil || inf.(int) != 1 {
+		t.Error("Found wrong value for IPv4-mapped IPv6 address (::ffff:1.2.3.4):", inf)
+	}
+
+	inf, err = tr.FindCIDR("::ffff:0102:0304")
+	if err != nil {
+		t.Error("Could not find IPv4-mapped IPv6 address (::ffff:0102:0304), error:", err)
+	} else if inf == nil || inf.(int) != 1 {
+		t.Error("Found wrong value for IPv4-mapped IPv6 address (:::ffff:0102:0304):", inf)
+	}
+
+	inf, err = tr.FindCIDR("1.2.3.4")
+	if err != nil {
+		t.Error("Could not find unmapped IPv4-mapped address (1.2.3.4), error:", err)
+	} else if inf == nil || inf.(int) != 1 {
+		t.Error("Found wrong value for unmapped IPv4-mapped address (1.2.3.4):", inf)
+	}
+}
+
+func TestIpv4MappedIpv6Prefix(t *testing.T) {
+	tr := NewTree(0)
+
+	if err := tr.AddCIDR("::ffff:1.2.0.1/112", 1); err != nil {
+		t.Error("Could not add IPv4-mapped IPv6 prefix:", err)
+	}
+
+	inf, err := tr.FindCIDR("1.2.3.4")
+	if err != nil {
+		t.Error("Could not find unmapped IPv4-mapped address (1.2.3.4), error:", err)
+	} else if inf == nil || inf.(int) != 1 {
+		t.Error("Found wrong value for unmapped IPv4-mapped address (1.2.3.4):", inf)
+	}
+
+	inf, err = tr.FindCIDR("1.3.0.0")
+	if err != nil {
+		t.Error("Could not find unmapped IPv4-mapped address (1.3.0.0), error:", err)
+	} else if inf != nil {
+		t.Error("Found wrong value for unmapped IPv4-mapped address (1.3.0.0):", inf)
+	}
+}
+
+func TestInvalidIpv4MappedIpv6Prefix(t *testing.T) {
+	tr := NewTree(0)
+
+	if err := tr.AddCIDR("::ffff:1.2.3.4/128", 1); err != nil {
+		t.Error("Could not add IPv4-mapped IPv6 prefix:", err)
+	}
+
+	if err := tr.AddCIDR("::ffff:1.2.3.4/95", 1); err == nil {
+		t.Error("Missing error when prefix too small for :", err)
+	}
+}
+
