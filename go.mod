@@ -1,1 +1,1 @@
-module github.com/asergeyev/nradix
+module github.com/jmeggitt/nradix
