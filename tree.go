@@ -451,12 +451,18 @@ func (tree *Tree) newnode() (p *node) {
 	return &(tree.alloc[ln])
 }
 
+// parseCIDR converts a string address or network prefix to a prefix in memory represented by a net.IP and net.IPMask.
+// Parsed IPs will be returned as single-address prefixes. It is also notable that all IPv4-mapped IPv6 addresses and
+// prefixes will be converted to their IPv4 counterparts to prevent multiple distinct instances of a single key from
+// being created. In the event that parsing can not be completed, a non-nil error will be returned instead.
 func parseCIDR(cidr []byte) (net.IP, net.IPMask, error) {
 	var address netip.Addr
 	var prefixLength int
 
 	// Check for '/' to determine if this is a single IP or prefix. This is the same approach used by net.ParseCIDR
 	if bytes.IndexByte(cidr, '/') < 0 {
+		// netip.ParseAddr is used instead of net.ParseIP since net.ParseIP reads all IPv4 addresses as IPv4-mapped IPv6
+		// addresses and the net package lacks the functionality to convert them back
 		addr, err := netip.ParseAddr(string(cidr))
 
 		if err != nil {
@@ -476,6 +482,8 @@ func parseCIDR(cidr []byte) (net.IP, net.IPMask, error) {
 		prefixLength = prefix.Bits()
 	}
 
+	// Check for IPv4-mapped IPv6 addresses and convert them to IPv4 by dropping the first 12 bytes of the IPv6 prefix
+	// Ex: ::ffff:1.2.3.4/112 -> 1.2.3.4/16
 	if address.Is4In6() {
 		address = address.Unmap()
 		prefixLength -= 8 * (net.IPv6len - net.IPv4len)
